@@ -78,6 +78,16 @@ func (w *WingProvider) Prepare(query string) (*sql.Stmt, error) {
 	return w.Conn.Prepare(query)
 }
 
+// IsEmpty call sql.Query() to check target data if exist
+func (w *WingProvider) IsEmpty(query string, args ...interface{}) (bool, error) {
+	rows, err := w.Conn.Query(query, args...)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	return !rows.Next(), nil
+}
+
 // QueryOne call sql.Query() to query one record
 func (w *WingProvider) QueryOne(query string, cb ScanCallback, args ...interface{}) error {
 	rows, err := w.Conn.Query(query, args...)
@@ -200,13 +210,19 @@ func (w *WingProvider) FormatSets(updates interface{}) string {
 		switch value.(type) {
 		case bool:
 			sets = append(sets, fmt.Sprintf(name+"=%v", value))
+		case invar.Bool:
+			boolvalue := value.(invar.Bool)
+			if boolvalue != invar.BNone {
+				truevalue := (boolvalue == invar.BTrue)
+				sets = append(sets, fmt.Sprintf(name+"=%v", truevalue))
+			}
 		case string:
 			trimvalue := strings.Trim(value.(string), " ")
 			if trimvalue != "" { // filter empty string fields
 				sets = append(sets, fmt.Sprintf(name+"='%s'", trimvalue))
 			}
 		case int, int8, int16, int32, int64, float32, float64,
-			invar.Status, invar.Box, invar.Role, invar.Limit, invar.Lang, invar.Kind, invar.Bool:
+			invar.Status, invar.Box, invar.Role, invar.Limit, invar.Lang, invar.Kind:
 			if fmt.Sprintf("%v", value) != "0" { // filter 0 fields
 				sets = append(sets, fmt.Sprintf(name+"=%v", value))
 			}
